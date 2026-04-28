@@ -1,4 +1,4 @@
-import 'package:fasum/screen/sign_in_screen.dart';
+import 'package:fasum_app/screens/sign_in_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
