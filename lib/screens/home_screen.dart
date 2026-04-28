@@ -1,6 +1,6 @@
-import 'package:fasum_app/screens/sign_in_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:fasum_app/screens/sign_in_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,31 +10,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _selectedCategory;
+  String? selectedCategory;
 
-  final List<String> categories = [
+  List<String> categories = [
     'Jalan Rusak',
     'Marka Pudar',
     'Lampu Mati',
     'Trotoar Rusak',
-    'Rambu Rusak',
     'Jembatan Rusak',
     'Sampah Menumpuk',
     'Saluran Tersumbat',
     'Sungai Tercemar',
+    'Sampah Sungai',
     'Pohon Tumbang',
     'Taman Rusak',
     'Fasilitas Rusak',
     'Pipa Bocor',
-    'Vandalisme',
+    'Vandalismw',
     'Banjir',
     'Lainnya',
   ];
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 
   String formatTime(DateTime dateTime) {
     final now = DateTime.now();
@@ -44,9 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (diff.inMinutes < 60) {
       return '${diff.inMinutes} mins ago';
     } else if (diff.inHours < 24) {
-      return '${diff.inHours} hrs ago';
-    } else if (diff.inDays < 2) {
-      return '${diff.inDays} day ago';
+      return '${diff.inHours} hours ago';
+    } else if (diff.inHours < 48) {
+      return '1 day ago';
     } else {
       return '${diff.inDays} days ago';
     }
@@ -62,37 +57,76 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showCategoryFilter() async {
-    final selected = await showModalBottomSheet<String>(
+  void _showCategoryFilter() async {
+    final result = await showModalBottomSheet<String?>(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
-        return ListView(
-          children: categories.map((category) {
-            return ListTile(
-              title: Text(category),
-              onTap: () => Navigator.pop(context, category),
-            );
-          }).toList(),
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.75,
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 20),
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.clear),
+                  title: const Text('Semua Kategori'),
+                  onTap: () => Navigator.pop(context, null),
+                ),
+                const Divider(),
+                ...categories.map(
+                  (category) => ListTile(
+                    title: Text(category),
+                    trailing: selectedCategory == category
+                        ? Icon(
+                            Icons.check,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(context, category),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
-    if (selected != null) {
-      setState(() => _selectedCategory = selected);
+    if (result != null) {
+      setState(() {
+        selectedCategory = result;
+      });
+    } else {
+      setState(() {
+        selectedCategory = null;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Fasum'),
-        backgroundColor: Colors.green[600],
-        elevation: 0,
+        title: Text(
+          "Fasum",
+          style: TextStyle(
+            color: Colors.blueAccent[600],
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            onPressed: _showCategoryFilter,
+            icon: const Icon(Icons.filter_list),
+            tooltip: "Filter Kategori",
+          ),
+          IconButton(
             onPressed: _signOut,
-            tooltip: 'Sign Out',
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
@@ -100,68 +134,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () async {
           setState(() {});
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // Category Filter Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Filter by Category',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _showCategoryFilter,
-                      icon: const Icon(Icons.filter_list),
-                      label: Text(_selectedCategory ?? 'Select Category'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Empty State
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.folder_open, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No reports yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Reports will appear here',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        child: Center(
+          child: Text('Firebase integration needed'),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: Colors.green[600],
-        child: const Icon(Icons.add),
       ),
     );
   }
