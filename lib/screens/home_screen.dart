@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fasum_app/screens/add_post_screen.dart';
 import 'package:fasum_app/screens/detail_screen.dart';
