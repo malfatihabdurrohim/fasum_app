@@ -38,6 +38,8 @@ dependencies:
   firebase_database: ^12.3.0
   firebase_auth: ^6.4.0
   cloud_firestore: ^6.3.0
+  permission_handler: ^11.3.0
+  firebase_messaging: ^16.2.0
   intl: ^0.20.0
   image_picker: ^1.0.0
 
