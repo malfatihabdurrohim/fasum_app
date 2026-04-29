@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 
 class DetailScreen extends StatelessWidget {
   final String imageBase64;
-  final String? description;
+  final String description;
   final DateTime createdAt;
   final String fullName;
   final double latitude;
