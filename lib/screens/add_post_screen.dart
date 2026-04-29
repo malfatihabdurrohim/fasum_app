@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddPostScreen extends StatefulWidget {
@@ -14,18 +14,19 @@ class AddPostScreen extends StatefulWidget {
 }
 
 class _AddPostScreenState extends State<AddPostScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _imagePicker = ImagePicker();
-  final _descriptionController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
 
-  File? _selectedImage;
-  String? _selectedCategory;
-  bool _isLoading = false;
-
-  List<String> categories = [
-    'Jalan Rusak',
+  File? _image;
+  String? base64Image;
+  final TextEditingController _captionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  final bool _isLoading = false;
+  double? _latitude;
+  double? _longitude;
+  String? _aiCategory;
+  String? _aiDescription;
+  bool _isGeneratingAI = false;
+  final List<String> _aiCategories = 
+  ['Jalan Rusak',
     'Marka Pudar',
     'Lampu Mati',
     'Trotoar Rusak',
@@ -42,272 +43,198 @@ class _AddPostScreenState extends State<AddPostScreen> {
     'Vandalisme',
     'Banjir',
     'Lainnya',
-  ];
-
-  Future<void> _pickImage() async {
+    ];
+  void _showCategorySelection() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return ListView(
+          shrinkWrap: true,
+          children: _aiCategories.map((category) {
+            return ListTile(
+              title: Text(category),
+              onTap: () {
+                setState(() {
+                  _aiCategory = category;
+                });
+                Navigator.pop(context);
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+  @override
+  void dispose() {
+    _captionController.dispose();
+    super.dispose();
+  }
+  Future<void> _compresssAndEncodeImage() async {
+    if (_image == null) return;
     try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
+      final compresssedImage = await FlutterImageCompress.compressWithFile(
+        _image!.path,
+        quality: 50,
       );
-      if (image != null) {
+      if (compresssedImage == null) return;
+      setState(() {
+        base64Image = _base64Encode(compresssedImage);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to compress image')),
+        );
+      }
+    }
+  }
+  Future<void> pickImage() async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _image = File(pickedFile.path);
+          _aiCategory = null;
+          _aiDescription = null;
+          _captionController.clear();
+        });
+        await _compresssAndEncodeImage();
+        await _generateDescriptionWithAI();
+      }
+  }
+    catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to pick image')),
+        );
+      }
+    }
+  }
+  
+  String _base64Encode(List<int> bytes) {
+    return base64Encode(bytes);
+  }
+  Future<void> _generateDescriptionWithAI() async {
+    if (_image == null) return;
+    setState(() => _isGeneratingAI = true);
+    try {
+      final model = GenerativeModel(
+        model: 'gemini-1.5-pro',
+        apiKey: 'AIzaSyBr8NC5HGVFbK8WBZeztM4zgkTlO4wj9WA',
+      );
+      final imageBytes = await _image!.readAsBytes();
+      final content = Content.multi([
+        DataPart('image/jpeg', imageBytes),
+        TextPart(
+          'Berdasarkan foto ini, identifikasi satu kategori utama kerusakan fasilitas umum dari daftar berikut: Jalan Rusak, Marka Pudar, Lampu Mati, Trotoar Rusak, Rambu Rusak, Jembatan Rusak, Sampah Menumpuk, Saluran Tersumbat, Sungai Tercemar, Sampah Sungai, Pohon Tumbang, Taman Rusak, Fasilitas Rusak, Pipa Bocor, Vandalisme, Banjir, dan Lainnya.\n'
+          'Pilih kategori yang paling dominan atau paling mendesak untuk ditanggani.\n'
+          'Buat deskripsi singkat untuk laporan perbaikan dan tambahkan pernyataan dan tindakan.\n'
+          'Fokus pada kerusakan yang terlihat dan hindari spekulasi.\n\n'
+          'Format output yang diinginkan:\n'
+          'Kategori: [satu kategori yang disalin]\n'
+          'Deskripsi: [deskripsi singkat]',
+        ),
+      ]);
+      final response = await model.generateContent([content]);
+      if (response.text != null) {
+        setState(() {
+          _aiDescription = response.text;
+          _isGeneratingAI = false;
         });
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+          SnackBar(content: Text('Failed to generate AI description: $e')),
         );
       }
+      setState(() => _isGeneratingAI = false);
     }
   }
-
-  Future<String> _convertImageToBase64(File image) async {
-    final bytes = await image.readAsBytes();
-    return base64Encode(bytes);
-  }
-
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih foto terlebih dahulu')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      final imageBase64 = await _convertImageToBase64(_selectedImage!);
-
-      await FirebaseFirestore.instance.collection('posts').add({
-        'fullName': user?.displayName ?? 'Anonim',
-        'description': _descriptionController.text,
-        'category': _selectedCategory ?? 'Lainnya',
-        'latitude': double.parse(_latitudeController.text),
-        'longitude': double.parse(_longitudeController.text),
-        'image': imageBase64,
-        'createdAt': DateTime.now().toIso8601String(),
-        'userId': user?.uid ?? '',
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Laporan berhasil dikirim!')),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tambah Laporan'),
+        title: const Text('Tambah Post'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image Picker
-              GestureDetector(
-                onTap: _isLoading ? null : _pickImage,
-                child: Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _image != null
+                ? ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outline,
+                    child: Image.file(
+                      _image!,
+                      height: 220,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Container(
+                    height: 220,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.image,
+                        size: 80,
+                        color: Colors.black38,
+                      ),
                     ),
                   ),
-                  child: _selectedImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            _selectedImage!,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.camera_alt,
-                              size: 48,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Ambil Foto',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Category Dropdown
-              Text(
-                'Kategori',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                hint: const Text('Pilih kategori'),
-                isExpanded: true,
-                items: categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: _isLoading ? null : (value) {
-                  setState(() => _selectedCategory = value);
-                },
-                validator: (value) {
-                  if (value == null) {
-                    return 'Kategori harus dipilih';
-                  }
-                  return null;
-                },
-              ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: pickImage,
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Pilih Foto'),
+            ),
+            const SizedBox(height: 16),
+            if (_isGeneratingAI) ...[
+              const Center(child: CircularProgressIndicator()),
               const SizedBox(height: 16),
-
-              // Description
-              Text(
-                'Deskripsi',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  hintText: 'Jelaskan masalah yang terjadi',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                maxLines: 4,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Deskripsi tidak boleh kosong';
-                  }
-                  if (value.length < 10) {
-                    return 'Deskripsi minimal 10 karakter';
-                  }
-                  return null;
-                },
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-
-              // Latitude
-              Text(
-                'Latitude',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _latitudeController,
-                decoration: InputDecoration(
-                  hintText: 'Contoh: -6.2088',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Latitude tidak boleh kosong';
-                  }
-                  try {
-                    double.parse(value);
-                  } catch (e) {
-                    return 'Latitude harus berupa angka';
-                  }
-                  return null;
-                },
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-
-              // Longitude
-              Text(
-                'Longitude',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _longitudeController,
-                decoration: InputDecoration(
-                  hintText: 'Contoh: 106.8456',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Longitude tidak boleh kosong';
-                  }
-                  try {
-                    double.parse(value);
-                  } catch (e) {
-                    return 'Longitude harus berupa angka';
-                  }
-                  return null;
-                },
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 24),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Kirim Laporan'),
-                ),
-              ),
             ],
-          ),
+            if (_aiCategory != null)
+              Text('Kategori AI: $_aiCategory', style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (_aiDescription != null) ...[
+              const SizedBox(height: 8),
+              Text(_aiDescription!),
+            ],
+            if (_latitude != null && _longitude != null) ...[
+              const SizedBox(height: 16),
+              Text('Lokasi: $_latitude, $_longitude'),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _captionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Caption',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _image == null || _isLoading ? null : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Data post disimpan (dummy action)')),
+                );
+              },
+              child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Simpan'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _showCategorySelection,
+              child: const Text('Pilih Kategori secara manual'),
+            ),
+          ],
         ),
       ),
     );
