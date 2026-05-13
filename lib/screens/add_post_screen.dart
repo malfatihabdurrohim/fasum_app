@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -22,8 +23,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
-  double? _latitude;
-  double? _longitude;
+  double? _Latitude;
+  double? _Longitude;
   String? _aiCategory;
   String? _aiDescription;
   bool _isGenerating = false;
@@ -107,9 +108,9 @@ Future <void> _compressAndEncodeImage() async {
       _image!.path,
       quality: 50,
     );
-    if (compressedImage == null) return;
-    setState(() {
-      _base64Image = base64Encode(compressedImage);
+    if (compressedImage != null) return;
+      setState(() {
+        _base64Image = base64Encode(compressedImage!);
     });
   } catch (e) {
     if (mounted) {
@@ -143,7 +144,7 @@ Future<void> _generateDescriptionWithAI() async {
 
     final response = await model.generateContent(content);
     final aiText = response.text;
-    debugPrint("AI Text: $aiText");
+    print("AI Text: $aiText");
 
     if (aiText != null && aiText.isNotEmpty) {
       final allLines = aiText.trim().split('\n'); // Ubah nama variabel agar tidak bentrok
@@ -179,7 +180,6 @@ Future<void> _getLocation() async {
   try {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Location services are disabled.'))
       );
@@ -189,7 +189,6 @@ Future<void> _getLocation() async {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Location permissions are denied.'))
         );
@@ -202,18 +201,17 @@ Future<void> _getLocation() async {
       ),
     ).timeout(const Duration(seconds: 10));
     setState(() {
-      _latitude = position.latitude;
-      _longitude = position.longitude;
+      _Latitude = position.latitude;
+      _Longitude = position.longitude;
     });
   } catch (e) {
     debugPrint('Failed to retrieve location: $e');
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Failed to retrieve location: $e')),
     );
     setState(() {
-      _latitude = null;
-      _longitude = null;
+      _Latitude = null;
+      _Longitude = null;
     });
   }
 }
@@ -281,8 +279,8 @@ Future<void> _submitPost() async {
       'description': _descriptionController.text,
       'category': _aiCategory ?? 'Tidak Diketahui',
       'createdAt': now,
-      'Latitude': _latitude,
-      'Longitude': _longitude,
+      'Latitude': _Latitude,
+      'Longitude': _Longitude,
       'fullName': fullName,
       'userId': uid,
     });
@@ -308,9 +306,8 @@ Future<void> _submitPost() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Post'),
-      ),
-      body: SingleChildScrollView(
+        title: Text('Add Post')),
+        body: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
