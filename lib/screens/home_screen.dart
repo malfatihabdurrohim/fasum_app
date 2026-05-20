@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fasum_app/screens/add_post_screen.dart';
-import 'package:fasum_app/screens/detail_screen.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:fasum_app/screens/sign_in_screen.dart';
+import 'package:fasum_app/screens/detail_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -16,7 +16,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? selectedCategory;
-
   List<String> categories = [
     'Jalan Rusak',
     'Marka Pudar',
@@ -98,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Theme.of (context).colorScheme.primary,
                         )
                         : null,
-                 onTap: () => Navigator.pop(context, category),
+                        onTap: () => Navigator.pop(context, category),
                   ),
                 ),
               ],
@@ -124,24 +123,24 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text (
+        title: Text(
           "Fasum",
           style: TextStyle(
             color: Colors.green[600],
             fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      actions: [
-        IconButton (
-          onPressed: _showCategoryFilter,
-          icon: const Icon(Icons.filter_list),
-          tooltip: 'Filter Kategori',
-      ),
-        IconButton(
-          onPressed: () {
-            signOut();
-          },
-          icon: const Icon (Icons.logout),
+        actions: [
+          IconButton(
+            onPressed: _showCategoryFilter,
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Filter Kategori',
+          ),
+          IconButton(
+            onPressed: () {
+              signOut();
+            },
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
@@ -150,42 +149,53 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {});
         },
         child: StreamBuilder(
-          stream:
-            FirebaseFirestore.instance
-              .collection('posts')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+          stream: FirebaseDatabase.instance.ref('posts').onValue,
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center (child: CircularProgressIndicator());
+            if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+              return const Center(child: CircularProgressIndicator());
             }
-            final posts =
-              snapshot.data!.docs.where((doc) {
-                final data = doc.data();
-                final category = data['category'] ?? 'Lainnya';
-                return selectedCategory == null ||
-                  selectedCategory == category;
-              }).toList();
+            
+            final data = snapshot.data!.snapshot.value as Map?;
+            if (data == null || data.isEmpty) {
+              return const Center(
+                child: Text("Tidak ada laporan untuk kategori ini."),
+              );
+            }
 
-            if (posts.isEmpty) {
-              return const Center (
-                child: Text ("Tidak ada laporan untuk kategori ini."),
-              ); 
+            List<MapEntry> postList = data.entries.toList();
+            
+            // Sort by createdAt descending
+            postList.sort((a, b) {
+              final aTime = DateTime.parse((a.value['createdAt'] ?? '').toString());
+              final bTime = DateTime.parse((b.value['createdAt'] ?? '').toString());
+              return bTime.compareTo(aTime);
+            });
+
+            final filteredPosts = postList.where((entry) {
+              final postData = entry.value;
+              final category = postData['category'] ?? 'Lainnya';
+              return selectedCategory == null || selectedCategory == category;
+            }).toList();
+
+            if (filteredPosts.isEmpty) {
+              return const Center(
+                child: Text("Tidak ada laporan untuk kategori ini."),
+              );
             }
 
             return ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: posts.length,
+              itemCount: filteredPosts.length,
               itemBuilder: (context, index) {
-                final data = posts [index].data();
-                final imageBase64 = data['image'];
-                final description = data['description'];
-                final createdAtStr = data['createdAt'];
-                final fullName = data['fullName'] ?? 'Anonim';
-                final latitude = data['latitude'];
-                final longitude = data['longitude'];
-                final category = data['category'] ?? 'Lainnya';
-                final createdAt = DateTime.parse(createdAtStr);
+                final postData = filteredPosts[index].value;
+                final imageBase64 = postData['image'];
+                final description = postData['description'];
+                final createdAtStr = postData['createdAt'];
+                final fullName = postData['fullName'] ?? 'Anonim';
+                final latitude = postData['latitude'];
+                final longitude = postData['longitude'];
+                final category = postData['category'] ?? 'Lainnya';
+                final createdAt = DateTime.parse(createdAtStr.toString());
                 String heroTag =
                   'fasum-image-${createdAt.millisecondsSinceEpoch}';
 
@@ -205,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           heroTag: heroTag,
                         ),
                       )
-                    );
+                    );  
                   },
                   child: Card(
                     elevation: 1,
@@ -274,14 +284,6 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const AddPostScreen()),
-          );
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }
