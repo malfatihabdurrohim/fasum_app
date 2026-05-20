@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 
-class FullImageScreen extends StatelessWidget {
+class FullImageScreen extends StatefulWidget {
   final String imageBase64;
   const FullImageScreen({super.key, required this.imageBase64});
 
+  @override
+  State<FullImageScreen> createState() => _FullImageScreenState();
+}
+
+class _FullImageScreenState extends State<FullImageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold (
