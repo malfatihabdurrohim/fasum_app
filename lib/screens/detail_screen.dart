@@ -27,10 +27,10 @@ class DetailScreen extends StatefulWidget {
   final String heroTag; 
 
   @override
-  State<DetailScreen> createState() => _DetailScreenState();
+  State<DetailScreen> createState() => DetailScreenState();
 }
   
-class _DetailScreenState extends State<DetailScreen> {
+class DetailScreenState extends State<DetailScreen> {
 
   Future<void> _openMaps() async {
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}');
