@@ -77,7 +77,9 @@ class DetailScreenState extends State<DetailScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => FullImageScreen(imageBase64: widget.imageBase64),
+                          builder: (context) => FullImageScreen(
+                            imageBase64: widget.imageBase64,
+                          ),
                         ),
                       );
                     },
