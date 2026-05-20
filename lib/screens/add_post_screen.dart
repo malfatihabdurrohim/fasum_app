@@ -431,5 +431,3 @@ Future<void> _submitPost() async {
           ),
         ),
     );
-  }
-}
