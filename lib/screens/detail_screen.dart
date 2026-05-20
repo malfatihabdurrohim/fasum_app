@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:fasum_app/screens/full_image_screen.dart';
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
-import 'full_image_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -27,11 +27,10 @@ class DetailScreen extends StatefulWidget {
   final String heroTag; 
 
   @override
-  State<DetailScreen> createState() => DetailScreenState();
+  State<DetailScreen> createState() => _DetailScreenState();
 }
   
-class DetailScreenState extends State<DetailScreen> {
-
+class _DetailScreenState extends State<DetailScreen> {
   Future<void> _openMaps() async {
     final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}');
     final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -77,9 +76,7 @@ class DetailScreenState extends State<DetailScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => FullImageScreen(
-                            imageBase64: widget.imageBase64,
-                          ),
+                          builder: (context) => FullImageScreen(imageBase64: widget.imageBase64),
                         ),
                       );
                     },

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:fasum_app/screens/sign_in_screen.dart';
 import 'package:fasum_app/screens/detail_screen.dart';
